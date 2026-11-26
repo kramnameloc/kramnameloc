@@ -9,31 +9,19 @@ layout: default
 {% assign share_summary = summary_text | default: site.description | uri_escape %}
 <article class="post-wrap">
   <header class="post-header">
-    <p class="post-kicker">Article</p>
-    <h1>{{ page.title }}</h1>
-    {% if page.subtitle %}
-      <p class="post-subtitle">{{ page.subtitle }}</p>
-    {% endif %}
-
-    <div class="post-meta">
-      <p class="post-date">
-        <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %-d, %Y" }}</time>
-      </p>
-      <p class="post-readtime">{{ read_minutes }} min read</p>
-    </div>
-
+    <p class="entry-meta">
+      <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %-d, %Y" }}</time>
+      <span aria-hidden="true">·</span>{{ read_minutes | at_least: 1 }} min read
+    </p>
+    <h1>{{ page.title | escape }}</h1>
     {% if summary_text and summary_text != '' %}
-      <section class="summary-block" aria-label="Article summary">
-        <h2>TL;DR</h2>
-        <p>{{ summary_text }}</p>
-      </section>
+      <p class="post-deck">{{ summary_text | escape }}</p>
     {% endif %}
-
     {% if page.tags and page.tags.size > 0 %}
       <ul class="tag-list" aria-label="Tags">
         {% for tag in page.tags %}
           <li>
-            <a href="{{ '/archive/' | relative_url }}?tag={{ tag | uri_escape }}">{{ tag }}</a>
+            <a href="{{ '/archive/' | relative_url }}?tag={{ tag | uri_escape }}">{{ site.data.topic_names[tag] | default: tag | replace: '-', ' ' | escape }}</a>
           </li>
         {% endfor %}
       </ul>
@@ -41,8 +29,10 @@ layout: default
   </header>
 
   <nav class="post-toc" aria-label="Table of contents" data-post-toc hidden>
-    <h2>On this page</h2>
-    <ol data-post-toc-list></ol>
+    <details>
+      <summary>On this page</summary>
+      <ol data-post-toc-list></ol>
+    </details>
   </nav>
 
   <section class="post-content">{{ content }}</section>
@@ -50,8 +40,8 @@ layout: default
   <section class="share-tools" aria-label="Share this article" data-share-tools>
     <h2>Share this article</h2>
     <div class="share-actions">
-      <button type="button" data-share-native>Share</button>
-      <button type="button" data-copy-link data-share-url="{{ share_url }}">Copy link</button>
+      <button type="button" data-share-native hidden>Share</button>
+      <button type="button" data-copy-link hidden data-share-url="{{ share_url }}">Copy link</button>
       <a href="https://x.com/intent/tweet?url={{ share_url | uri_escape }}&text={{ share_title }}" target="_blank" rel="noopener noreferrer">X</a>
       <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ share_url | uri_escape }}" target="_blank" rel="noopener noreferrer">LinkedIn</a>
       <a href="https://www.reddit.com/submit?url={{ share_url | uri_escape }}&title={{ share_title }}" target="_blank" rel="noopener noreferrer">Reddit</a>
@@ -62,10 +52,10 @@ layout: default
 
   <nav class="post-nav" aria-label="Post navigation">
     {% if page.previous %}
-      <a href="{{ page.previous.url | relative_url }}">&larr; {{ page.previous.title }}</a>
+      <a href="{{ page.previous.url | relative_url }}"><small>Earlier entry</small>{{ page.previous.title | escape }}</a>
     {% endif %}
     {% if page.next %}
-      <a href="{{ page.next.url | relative_url }}">{{ page.next.title }} &rarr;</a>
+      <a href="{{ page.next.url | relative_url }}"><small>Later entry</small>{{ page.next.title | escape }}</a>
     {% endif %}
   </nav>
 </article>

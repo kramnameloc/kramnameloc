@@ -8,7 +8,7 @@ This repository now contains a Jekyll-powered GitHub Pages site generated from `
 - Dedicated archive and topics pages
 - Client-side search/filter discovery (`q`, `tag`, `year`) powered by `search.json`
 - Light and dark mode (system-aware with manual toggle and persistence)
-- Post reading enhancements (TL;DR summary, TOC, reading time, share actions)
+- Post summaries, collapsible tables of contents, reading times, and sharing controls
 - SEO stack (`jekyll-seo-tag`, `jekyll-sitemap`, `jekyll-feed`) with metadata validation
 - GitHub Actions for PR build validation and Pages deploy
 

@@ -41,35 +41,25 @@
     var button = document.getElementById("theme-toggle");
     if (!button) return;
 
-    var storageEnabled = true;
-    try {
-      localStorage.getItem("theme");
-    } catch (e) {
-      storageEnabled = false;
+    var systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    function isDark() {
+      var override = document.documentElement.dataset.theme;
+      return override ? override === "dark" : systemTheme.matches;
     }
-
-    function currentTheme() {
-      return document.documentElement.getAttribute("data-theme");
+    function syncButton() {
+      button.setAttribute("aria-pressed", String(isDark()));
     }
-
-    function apply(next) {
-      if (next === "light" || next === "dark") {
-        document.documentElement.setAttribute("data-theme", next);
-        if (storageEnabled) localStorage.setItem("theme", next);
-        button.setAttribute("aria-pressed", String(next === "dark"));
-        return;
-      }
-
-      document.documentElement.removeAttribute("data-theme");
-      if (storageEnabled) localStorage.removeItem("theme");
-      button.setAttribute("aria-pressed", "false");
-    }
-
     button.addEventListener("click", function () {
-      apply(currentTheme() === "dark" ? "light" : "dark");
+      var next = isDark() ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      try {
+        localStorage.setItem("theme", next);
+      } catch (error) {}
+      syncButton();
     });
-
-    button.setAttribute("aria-pressed", String(currentTheme() === "dark"));
+    systemTheme.addEventListener("change", syncButton);
+    syncButton();
+    button.hidden = false;
   }
 
   function initPostToc() {
@@ -170,6 +160,7 @@
         if (!navigator.share) {
           nativeButton.hidden = true;
         } else {
+          nativeButton.hidden = false;
           nativeButton.addEventListener("click", function () {
             navigator
               .share({
@@ -184,6 +175,7 @@
       }
 
       if (copyButton) {
+        copyButton.hidden = false;
         copyButton.addEventListener("click", function () {
           copyText(shareUrl)
             .then(function () {
@@ -197,184 +189,95 @@
     });
   }
 
-  var discoveryCachePromise;
-  function loadDiscoveryData() {
-    if (discoveryCachePromise) {
-      return discoveryCachePromise;
+  function renderResult(post) {
+    var summary = post.summary ? '<p class="excerpt">' + escapeHtml(post.summary) + '</p>' : '';
+    return '<article class="entry">' +
+      '<p class="entry-meta"><time datetime="' + escapeHtml(post.date) + '">' + escapeHtml(formatDate(post.date)) +
+      '</time><span aria-hidden="true">·</span>' + escapeHtml(String(post.readTime || 1)) + ' min read</p>' +
+      '<h3><a href="' + escapeHtml(post.url) + '">' + escapeHtml(post.title) + '</a></h3>' +
+      summary + '</article>';
+  }
+
+  async function initDiscovery() {
+    var root = document.querySelector("[data-discovery-root]");
+    if (!root) return;
+
+    var form = root.querySelector("[data-discovery-form]");
+    var status = root.querySelector("[data-discovery-status]");
+    var defaults = root.querySelector("[data-discovery-default]");
+    var results = root.querySelector("[data-discovery-results]");
+    var archive = root.querySelector("[data-view-archive]");
+    var heading = root.querySelector("#recent-title");
+    var clear = root.querySelector("[data-clear-filters]");
+    var limit = Number(root.dataset.discoveryLimit) || Infinity;
+    var params = new URLSearchParams(window.location.search);
+    var posts;
+    try {
+      var response = await fetch(sitePath("/search.json"));
+      if (!response.ok) throw new Error("Search index unavailable");
+      posts = await response.json();
+    } catch (error) {
+      status.textContent = "Search is unavailable. You can still browse the journal entries.";
+      return;
     }
 
-    discoveryCachePromise = fetch(sitePath("/search.json"), {
-      headers: {
-        Accept: "application/json"
+    ["q", "tag", "year"].forEach(function (key) {
+      var value = params.get(key) || "";
+      var control = form.elements[key];
+      // Preserve shared links even when a topic or year is no longer in the index.
+      if (value && control.tagName === "SELECT" && !Array.from(control.options).some(function (option) { return option.value === value; })) {
+        control.add(new Option(value, value));
       }
-    })
-      .then(function (response) {
-        if (!response.ok) {
-          throw new Error("Could not load search index");
-        }
-        return response.json();
-      })
-      .catch(function () {
-        return [];
-      });
-
-    return discoveryCachePromise;
-  }
-
-  function ensureOption(select, value) {
-    if (!select || !value) return;
-    var existing = Array.prototype.slice
-      .call(select.options)
-      .some(function (option) {
-        return option.value === value;
-      });
-
-    if (!existing) {
-      var option = document.createElement("option");
-      option.value = value;
-      option.textContent = value;
-      select.appendChild(option);
-    }
-  }
-
-  function renderDiscoveryCard(item) {
-    var tags = Array.isArray(item.tags) ? item.tags : [];
-    var tagsHtml =
-      tags.length > 0
-        ? '<ul class="tag-list" aria-label="Post tags">' +
-          tags
-            .map(function (tag) {
-              var href = sitePath("/archive/") + "?tag=" + encodeURIComponent(tag);
-              return '<li><a href="' + href + '">' + escapeHtml(tag) + "</a></li>";
-            })
-            .join("") +
-          "</ul>"
-        : "";
-
-    var summary = item.summary ? '<p class="card-description">' + escapeHtml(item.summary) + "</p>" : "";
-
-    return (
-      '<article class="discover-card">' +
-      '<p class="card-date">' +
-      escapeHtml(formatDate(item.date)) +
-      " \u00b7 " +
-      escapeHtml(String(item.readTime || 1)) +
-      ' min read</p>' +
-      '<h3><a href="' +
-      escapeHtml(item.url) +
-      '">' +
-      escapeHtml(item.title) +
-      "</a></h3>" +
-      summary +
-      tagsHtml +
-      "</article>"
-    );
-  }
-
-  function initDiscovery() {
-    var roots = Array.prototype.slice.call(document.querySelectorAll("[data-discovery-root]"));
-    if (roots.length === 0) return;
-
-    loadDiscoveryData().then(function (allPosts) {
-      if (!Array.isArray(allPosts) || allPosts.length === 0) return;
-
-      roots.forEach(function (root) {
-        var queryInput = root.querySelector("[data-discovery-query]");
-        var tagSelect = root.querySelector("[data-discovery-tag]");
-        var yearSelect = root.querySelector("[data-discovery-year]");
-        var results = root.querySelector("[data-discovery-results]");
-        var empty = root.querySelector("[data-discovery-empty]");
-        var limit = Number(root.getAttribute("data-discovery-limit") || 12);
-        var skipFeatured = root.getAttribute("data-discovery-skip-featured") === "true";
-
-        if (!results) return;
-
-        var posts = skipFeatured ? allPosts.slice(1) : allPosts.slice();
-        var params = new URLSearchParams(window.location.search);
-        var initialQuery = (params.get("q") || "").trim();
-        var initialTag = (params.get("tag") || "").trim();
-        var initialYear = (params.get("year") || "").trim();
-
-        if (tagSelect) ensureOption(tagSelect, initialTag);
-        if (yearSelect) ensureOption(yearSelect, initialYear);
-
-        if (queryInput) queryInput.value = initialQuery;
-        if (tagSelect) tagSelect.value = initialTag;
-        if (yearSelect) yearSelect.value = initialYear;
-
-        function currentFilters() {
-          var qRaw = queryInput ? queryInput.value.trim() : "";
-          return {
-            q: qRaw.toLowerCase(),
-            qRaw: qRaw,
-            tag: tagSelect ? tagSelect.value.trim() : "",
-            year: yearSelect ? yearSelect.value.trim() : ""
-          };
-        }
-
-        function updateQueryString(filters) {
-          var next = new URLSearchParams(window.location.search);
-
-          if (filters.qRaw) next.set("q", filters.qRaw);
-          else next.delete("q");
-
-          if (filters.tag) next.set("tag", filters.tag);
-          else next.delete("tag");
-
-          if (filters.year) next.set("year", filters.year);
-          else next.delete("year");
-
-          var query = next.toString();
-          var nextUrl = window.location.pathname + (query ? "?" + query : "") + window.location.hash;
-          window.history.replaceState({}, "", nextUrl);
-        }
-
-        function applyFilters() {
-          var filters = currentFilters();
-          var filtered = posts.filter(function (item) {
-            var tags = Array.isArray(item.tags) ? item.tags : [];
-            var haystack = (item.title + " " + item.summary + " " + tags.join(" ")).toLowerCase();
-
-            if (filters.q && haystack.indexOf(filters.q) === -1) {
-              return false;
-            }
-
-            if (filters.tag && tags.indexOf(filters.tag) === -1) {
-              return false;
-            }
-
-            if (filters.year && String(item.year) !== filters.year) {
-              return false;
-            }
-
-            return true;
-          });
-
-          updateQueryString(filters);
-
-          if (filtered.length === 0) {
-            results.innerHTML = "";
-            if (empty) empty.hidden = false;
-            return;
-          }
-
-          if (empty) empty.hidden = true;
-          results.innerHTML = filtered.slice(0, limit).map(renderDiscoveryCard).join("");
-        }
-
-        if (queryInput) {
-          queryInput.addEventListener("input", applyFilters);
-        }
-        if (tagSelect) {
-          tagSelect.addEventListener("change", applyFilters);
-        }
-        if (yearSelect) {
-          yearSelect.addEventListener("change", applyFilters);
-        }
-
-        applyFilters();
-      });
+      control.value = value;
     });
+
+    function filterPosts() {
+      var query = form.elements.q.value.trim();
+      var tag = form.elements.tag.value;
+      var year = form.elements.year.value;
+      var active = Boolean(query || tag || year);
+      var url = new URL(window.location.href);
+      Object.entries({q: query, tag: tag, year: year}).forEach(function (entry) {
+        if (entry[1]) url.searchParams.set(entry[0], entry[1]);
+        else url.searchParams.delete(entry[0]);
+      });
+      if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
+      if (archive) archive.href = sitePath("/archive/") + url.search;
+      if (heading) heading.textContent = active ? "Search results" : "Recent writing";
+      defaults.hidden = active;
+      results.hidden = !active;
+      clear.hidden = !active;
+      if (!active) {
+        results.replaceChildren();
+        status.textContent = "";
+        return;
+      }
+
+      var needle = query.toLowerCase();
+      var matches = posts.filter(function (post) {
+        var tags = post.tags || [];
+        var text = [post.title, post.summary].concat(tags).join(" ").toLowerCase();
+        return text.includes(needle) && (!tag || tags.includes(tag)) && (!year || post.year === year);
+      });
+      var visible = matches.slice(0, limit);
+      results.innerHTML = visible.map(renderResult).join("");
+      if (matches.length === 0) status.textContent = "No posts match these filters.";
+      else if (visible.length < matches.length) status.textContent = "Showing " + visible.length + " of " + matches.length + " matching posts.";
+      else status.textContent = matches.length + (matches.length === 1 ? " matching post." : " matching posts.");
+    }
+
+    form.addEventListener("input", filterPosts);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      filterPosts();
+    });
+    clear.addEventListener("click", function () {
+      form.reset();
+      filterPosts();
+      form.elements.q.focus();
+    });
+    filterPosts();
+    form.hidden = false;
   }
 
   function init() {

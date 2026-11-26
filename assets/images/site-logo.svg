@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Kramnameloc logo">
-  <rect width="512" height="512" rx="96" fill="#0f6ad8"/>
-  <path d="M118 120h64v118l102-118h82L253 248l125 144h-84L182 264v128h-64z" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" role="img" aria-label="Kramnameloc">
+  <rect width="40" height="40" rx="9" fill="#35533c"/>
+  <g stroke="#f6f5e9" stroke-width="3.4">
+    <path d="M20 6v28M6 20h28M10.1 10.1l19.8 19.8M10.1 29.9l19.8-19.8"/>
+  </g>
 </svg>
