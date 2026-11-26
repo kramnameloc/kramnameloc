@@ -1,0 +1,25 @@
+{% assign sorted_tags = site.tags | sort %}
+{% assign years = site.posts | group_by_exp: "post", "post.date | date: '%Y'" %}
+<form class="filters" role="search" action="{{ '/archive/' | relative_url }}" data-discovery-form hidden>
+  <label class="search-field">
+    {% include icon.html name='search' %}
+    <span class="sr-only">Search posts</span>
+    <input type="search" name="q" placeholder="Search posts" autocomplete="off" data-discovery-query>
+  </label>
+  <label class="select-field">
+    <span class="sr-only">Filter by topic</span>
+    <select name="tag" data-discovery-tag>
+      <option value="">All topics</option>
+      {% for topic in sorted_tags %}{% assign slug = topic[0] %}<option value="{{ slug | escape }}">{{ site.data.topic_names[slug] | default: slug | replace: '-', ' ' }}</option>{% endfor %}
+    </select>
+    {% include icon.html name='chevron' %}
+  </label>
+  <label class="select-field">
+    <span class="sr-only">Filter by year</span>
+    <select name="year" data-discovery-year>
+      <option value="">All years</option>
+      {% for year in years %}<option value="{{ year.name }}">{{ year.name }}</option>{% endfor %}
+    </select>
+    {% include icon.html name='chevron' %}
+  </label>
+</form>

@@ -3,43 +3,37 @@ layout: "post"
 title: "Automating Disney"
 date: 2021-04-29 22:05:43 -0400
 description: "Setting up a pipedream.com workflow"
-summary: "Setting up a pipedream.com workflow"
+summary: "How a small Pipedream workflow helped my family find an opening at Disney’s Magic Kingdom."
 subtitle: "Setting up a pipedream.com workflow"
 tags:
   - automation
   - javascript
   - devops
+cover: "/assets/images/castle.jpg"
 ---
 ## The Problem
 
-My family had the dream of going to Disney for my sister in law birthday in April and after coordinating the house, plane tickets, multiple families, and tickets we had a problem.  The park tickets were not purchased at the exact same moment and some of the family was not able to [reserve their park](https://disneyworld.disney.go.com/experience-updates/park-reservations/)! How could we fix this so the family can go to the park together? 
+My family planned an April trip to Disney for my sister-in-law’s birthday. We had the house, the flights, and the tickets. Then we hit a snag. We’d bought our tickets at different times, and some of us couldn’t [reserve a spot at Magic Kingdom](https://disneyworld.disney.go.com/experience-updates/park-reservations/).
+
+I wanted to know as soon as a spot opened up so we could all go together.
 
 ## The Calendar
-![Illustration from Automating Disney (1)]({{ '/assets/blog-images/2021-04-29-automating-disney/01-calendar.png' | relative_url }})
-We could do the following...
+![Disney’s park reservation calendar showing availability by date]({{ '/assets/blog-images/2021-04-29-automating-disney/01-calendar.png' | relative_url }})
 
-- Manually Click Dates
-- Check Available Parks
-- Repeat above…forever…hoping to get lucky
-
-This clearly is not something we can do...there must be a way to dig deeper and automate the checking.
+Checking by hand meant picking a date, reading the list of available parks, and doing it all again. I wanted to spend my time planning the trip, so I looked for the data behind the calendar.
 
 ## Finding The Data
-![Illustration from Automating Disney (2)]({{ '/assets/blog-images/2021-04-29-automating-disney/02-preview.png' | relative_url }})
+![The calendar response in the browser’s network inspector]({{ '/assets/blog-images/2021-04-29-automating-disney/02-preview.png' | relative_url }})
 
-Lets look to see how the calendar actually works.
-
-- Inspect page load via developer tools
-- Check XHR to see if there are any api requests....
-- Looking through the requests we see `calendar`
+I opened the browser’s developer tools, reloaded the page, and checked the XHR requests. One request was named `calendar`.
 
 ## The API
 
-If you view the request in a new window we get some nicely formatted `json` and the url is human readable.
+Opening the request in a new window showed the JSON response. The URL also showed how the calendar narrowed the search.
 
 >https://disneyworld.disney.go.com/availability-calendar/api/calendar?segment=tickets&startDate=2021-04-05&endDate=2021-04-30
 
-Thankful we see that the query string has a lot of helpful parameters
+Three query parameters mattered for our trip.
 
 - `startDate`
 - `endDate`
@@ -80,27 +74,21 @@ Now that we discovered the format of the request next we need to understand the 
   }
 ]
 ```
-The good news the json response is fairly straight forward except for some magic numbers.
+Each item had three fields. The park IDs took a little detective work.
 
 - `date`
 - `availability` 
 - `parks` list of parks that are available
   - `Epcot 80007838`
-   - `Animal Kingdom 80007823`
-   - `Magic Kingdom 80007944`
-   - `Hollywood Studios  80007998`
+  - `Animal Kingdom 80007823`
+  - `Magic Kingdom 80007944`
+  - `Hollywood Studios 80007998`
 
-_We were able to reverse engineer the above magic numbers by clicking around the calendar and recording which numbers showed up compared to what was displayed on the screen._
+We matched each ID to a park by picking dates on the calendar and comparing the names on screen with the numbers in the response.
 
 ## NodeJs
 
-Now that we had an api, understood the request and response lets use turn this into a small program using NodeJs and [`🔗axios`](https://github.com/axios/axios).  Our program will need to do the following.
-
-- Request Data from the API
-- Parse the response
-- If availability do…….something.
-
-Once we put this all together we ended up with the following.
+I used Node.js and [Axios](https://github.com/axios/axios) to check the date we wanted. The script needed to fetch availability, match park IDs to names, and flag an opening at Magic Kingdom.
 
 ```javascript
 const axios = require("axios");
@@ -149,13 +137,13 @@ let url =
 })();
 ```
 
-As you can see from the above we parsed the response and then captured the parks that are available and only trigger an alert for `Magic Kingdom` as that was the park the family wanted to go to on the day `2021-04-17`
-
+The script listed every park with space on April 17, 2021. Only an opening at Magic Kingdom triggered our alert.
 
 ## Automation
-Now that we had a node program we needed to run this on a schedule to automagically check ever so often to see if any new parks open up. We could run via cron or similar scheduling tools, manually run it, or a server-less approach.
 
-![Illustration from Automating Disney (3)]({{ '/assets/blog-images/2021-04-29-automating-disney/03-pipedream.png' | relative_url }})
+The next question was where to run the check. A cron job would work, but a hosted workflow could keep checking even when my computer was off.
+
+![The scheduled calendar-checking workflow in Pipedream]({{ '/assets/blog-images/2021-04-29-automating-disney/03-pipedream.png' | relative_url }})
 
 I decided to go with [pipedream](https://pipedream.com) as it ticked all the boxes.
 
@@ -163,15 +151,15 @@ I decided to go with [pipedream](https://pipedream.com) as it ticked all the box
 
 ### Convert to Workflow
 
-It was fairly straightforward to convert the NodeJs program to a pipe dream workflow as it had node support at its core which made the migration easy.
+Pipedream supported Node.js, so I could reuse the code that checked the calendar.
 
 ### Steps
 
-The first thing we needed to do is define a few steps to help flow together what has to happen at each execution along the way.
+I split the workflow into three steps. One supplied the date, one checked availability, and one sent the email.
 
 #### Dates
 
-We had a step for date that just returns the date we want to check for the calendar checking step.
+The first step returned the date we wanted to check.
 
 ```javascript
 async (event, steps) => {
@@ -183,7 +171,7 @@ async (event, steps) => {
 
 #### Check API
 
-As you can see this is a fairly easy migration but a few changes happened to make it work in pipedream
+The calendar check needed two changes to run as a workflow step.
 
 - pass in the `date` via the `steps` object `steps.date_to_check.$return_value.date;`
 - return an object so it can be used in future steps
@@ -246,7 +234,7 @@ async (event, steps) => {
 
 #### Email
 
-As we said above we want to do something this if the alert is triggered which in this workflow happens to be an email.  My favorite zero friction email service happens to be [sendgrid](https://sendgrid.com)  and good news is [pipedream has a built in connector to send grid](https://pipedream.com/apps/sendgrid).
+I used [SendGrid](https://sendgrid.com) for email. [Pipedream’s SendGrid connector](https://pipedream.com/apps/sendgrid) gave me a template to start from.
 
 ```javascript
 async (event, steps, params, auths) => {
@@ -288,7 +276,7 @@ _we modified the built in template slightly to only send the email if `steps.che
 Now that we have all of these in place it is time to try it out by finding a date that has availability and use that in the `date` step.
 
 ### Testing It Out
-![Illustration from Automating Disney (4)]({{ '/assets/blog-images/2021-04-29-automating-disney/04-email.png' | relative_url }})
+![An email alert listing available parks for the selected date]({{ '/assets/blog-images/2021-04-29-automating-disney/04-email.png' | relative_url }})
 
 We set the workflow to trigger every 10 minutes and as soon as we hit the right condition we got the above email.
 
@@ -296,4 +284,4 @@ We set the workflow to trigger every 10 minutes and as soon as we hit the right 
 
 ### Yes
 
-It actually did work we triggered the check every 10 minutes and as soon as I got the email I resorted to the manual flow of contacting every family member.  I could have easily used twilio to make a phone call, maybe that will be in the next iteration.
+It worked. As soon as the email arrived, I contacted every family member by hand. Maybe next time I’ll let Twilio make the calls, too.

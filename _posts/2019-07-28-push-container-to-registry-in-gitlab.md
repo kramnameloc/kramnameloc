@@ -3,11 +3,12 @@ layout: "post"
 title: "Push Container to Registry in GitLab"
 date: 2019-07-28 11:58:46 -0400
 description: "Generate Personal Access Token for Docker Login Navigate over to the access token section in your profile. Scope to and set your expiration date. store this key"
-summary: "Generate Personal Access Token for Docker Login Navigate over to the access token section in your profile."
+summary: "Building, tagging, and pushing a Docker image to GitLab’s container registry."
 tags:
   - cloud
   - devops
   - web
+cover: "/assets/images/containers.jpg"
 ---
 ## Generate Personal Access Token for Docker Login
 
